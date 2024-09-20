@@ -28,12 +28,7 @@ internal class MigratorCommand : Command
 
         logger.LogDebug("Called with log level {LogLevel}", logLevel);
 
-        // TODO: Use current directory
-        //var searchPath = "/home/andrei/RiderProjects/advent-of-code";
-        //var searchPath = "/home/andrei/RiderProjects/AspNetCore.DataProtection.MySql";
-        //var searchPath = Path.GetDirectoryName(solutionFile)!;
         var searchPath = Directory.GetCurrentDirectory();
-
         logger.LogInformation("Adding central package management under search path: {SearchPath}", searchPath);
 
         var directoryPackagesProps = new PackagesPropsBuilder(LoggingUtility.CreateLogger<PackagesPropsBuilder>(),
