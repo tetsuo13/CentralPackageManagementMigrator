@@ -6,8 +6,7 @@ namespace CentralPackageManagementMigrator;
 
 internal class MigratorCommand : Command
 {
-    // TODO: Should match NuGet spec
-    private const string CommandName = "centralpackagemanagement-migrator";
+    private const string CommandName = "centralpackagemanagementmigrator";
     private const string CommandDescription = "Migrates a codebase to use NuGet central package management (CPM)";
 
     private readonly Option<LogLevel> _logLevelOption = new(["-v", "--verbosity"],

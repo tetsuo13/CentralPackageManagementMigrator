@@ -5,6 +5,27 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>CentralPackageManagementMigrator</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <ToolCommandName>centralpackagemanagementmigrator</ToolCommandName>
+    <Copyright>Copyright 2024 Andrei Nicholson</Copyright>
+    <Authors>Andrei Nicholson</Authors>
+    <PackageTags>NuGet;Central Package Management;CPM</PackageTags>
+    <Description>Migrates a codebase to use NuGet central package management (CPM)</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>https://github.com/tetsuo13/CentralPackageManagementMigrator/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/tetsuo13/CentralPackageManagementMigrator</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/tetsuo13/CentralPackageManagementMigrator.git</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Features>strict</Features>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <DebugType>embedded</DebugType>
+    <DefaultLanguage>en-US</DefaultLanguage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +36,17 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests"/>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Pack="true" Visible="false" PackagePath="\"/>
+    <None Include="..\..\README.md" Pack="true" Visible="false" PackagePath="\"/>
   </ItemGroup>
 
 </Project>
