@@ -11,7 +11,7 @@
     <ToolCommandName>centralpackagemanagementmigrator</ToolCommandName>
     <Copyright>Copyright 2024 Andrei Nicholson</Copyright>
     <Authors>Andrei Nicholson</Authors>
-    <PackageTags>NuGet;Central Package Management;CPM</PackageTags>
+    <PackageTags>NuGet;central;package;management;CentralPackageManagement;CPM;migrator</PackageTags>
     <Description>Migrates a codebase to use NuGet central package management (CPM)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>https://github.com/tetsuo13/CentralPackageManagementMigrator/blob/main/CHANGELOG.md</PackageReleaseNotes>
