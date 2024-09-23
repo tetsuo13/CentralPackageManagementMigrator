@@ -29,7 +29,7 @@ Description:
   Migrates a codebase to use NuGet central package management (CPM)
 
 Usage:
-  centralpackagemanagement-migrator [options]
+  centralpackagemanagementmigrator [options]
 
 Options:
   -v, --verbosity <Critical|Debug|Error|Information|None|Trace|Warning>  Verbosity level of the console logging output. [default: Information]
