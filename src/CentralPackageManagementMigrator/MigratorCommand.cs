@@ -46,7 +46,9 @@ internal class MigratorCommand : Command
 
             if (packages.Count > 0)
             {
-                directoryPackagesProps.WriteFile(packages);
+                var distinctPackages = packages.ToDistinctOrder();
+
+                directoryPackagesProps.WriteFile(distinctPackages);
                 projectBuilder.UpdateProjects(packages);
             }
             else

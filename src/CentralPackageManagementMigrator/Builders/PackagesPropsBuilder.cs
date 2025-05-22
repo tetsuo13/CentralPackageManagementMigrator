@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Text;
 using System.Xml;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,7 @@ internal class PackagesPropsBuilder
         _filePath = Path.Combine(filePath, TargetFileName);
     }
 
-    public void WriteFile(ReadOnlyDictionary<string, ReadOnlyCollection<NuGetPackageInfo>> packages)
+    public void WriteFile(IEnumerable<NuGetPackageInfo> packages)
     {
         _logger.LogInformation("Writing file to {FilePath}", _filePath);
 
@@ -46,7 +45,7 @@ internal class PackagesPropsBuilder
     /// it returns a string of the generated XML document instead of writing
     /// to disk.
     /// </summary>
-    internal string GenerateXml(ReadOnlyDictionary<string, ReadOnlyCollection<NuGetPackageInfo>> packages)
+    internal string GenerateXml(IEnumerable<NuGetPackageInfo> packages)
     {
         var doc = GenerateDocument(packages);
         var stringWriter = new StringBuilder();
@@ -64,7 +63,7 @@ internal class PackagesPropsBuilder
         doc.WriteTo(writer);
     }
 
-    private XmlDocument GenerateDocument(ReadOnlyDictionary<string, ReadOnlyCollection<NuGetPackageInfo>> packages)
+    private XmlDocument GenerateDocument(IEnumerable<NuGetPackageInfo> packages)
     {
         _logger.LogDebug("Generating XML document");
         var doc = new XmlDocument();
@@ -82,14 +81,7 @@ internal class PackagesPropsBuilder
 
         var itemGroup = doc.CreateElement(string.Empty, "ItemGroup", string.Empty);
 
-        // Unique packages sorted by ID.
-        // If there are multiple versions of a package, take the lowest one.
-        var unique = packages.SelectMany(x => x.Value)
-            .GroupBy(x => x.Id)
-            .Select(MinimumPackageVersion)
-            .OrderBy(x => x.Id, StringComparer.InvariantCultureIgnoreCase);
-
-        foreach (var package in unique)
+        foreach (var package in packages)
         {
             var packageVersion = doc.CreateElement(string.Empty, "PackageVersion", string.Empty);
             packageVersion.SetAttribute("Include", package.Id);
@@ -101,18 +93,5 @@ internal class PackagesPropsBuilder
         project.AppendChild(itemGroup);
 
         return doc;
-    }
-
-    /// <summary>
-    /// Finds the instance with the "lowest" version.
-    /// </summary>
-    /// <param name="arg">A grouping of instances with the same package ID.</param>
-    /// <typeparam name="T">A <see cref="NuGetPackageInfo"/> instance.</typeparam>
-    /// <returns>The instance with the lowest version.</returns>
-    private static T MinimumPackageVersion<T>(IGrouping<string, T> arg)
-        where T : NuGetPackageInfo
-    {
-        // A naive algorithm
-        return arg.OrderBy(x => x.Version).First();
     }
 }
