@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using CentralPackageManagementMigrator.Builders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -79,12 +78,12 @@ public class ProjectBuilderTests
                                  """;
 
         var projectBuilder = GetBuilder();
-        var actual = projectBuilder.UpdateProjectFromSource(csproj, packages.AsReadOnly());
+        var actual = projectBuilder.UpdateProjectFromSource(csproj, packages);
 
         Assert.Equal(expected, actual);
     }
 
-    private static ReadOnlyCollection<NuGetPackageInfo> GetPackagesProjectSource(string csproj)
+    private static List<NuGetPackageInfo> GetPackagesProjectSource(string csproj)
     {
         var projectBuilder = GetBuilder();
         return projectBuilder.GetPackagesProjectSource(csproj);

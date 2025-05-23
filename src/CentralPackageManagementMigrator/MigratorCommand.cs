@@ -25,7 +25,7 @@ internal class MigratorCommand : Command
         LoggingUtility.SetupLogging(logLevel);
         var logger = LoggingUtility.CreateLogger<MigratorCommand>();
 
-        logger.LogDebug("Called with log level {LogLevel}", logLevel);
+        logger.LogDebug("Called with verbosity: {Level}", logLevel.ToString());
 
         var searchPath = Directory.GetCurrentDirectory();
         logger.LogInformation("Adding central package management under search path: {SearchPath}", searchPath);
@@ -46,7 +46,9 @@ internal class MigratorCommand : Command
 
             if (packages.Count > 0)
             {
-                directoryPackagesProps.WriteFile(packages);
+                var distinctPackages = packages.ToDistinctOrder();
+
+                directoryPackagesProps.WriteFile(distinctPackages);
                 projectBuilder.UpdateProjects(packages);
             }
             else

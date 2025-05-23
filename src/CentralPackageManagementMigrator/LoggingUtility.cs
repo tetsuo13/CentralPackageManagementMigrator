@@ -10,7 +10,7 @@ internal static class LoggingUtility
     private static ILoggerFactory? _loggerFactory;
     private static ILoggerFactory Factory
     {
-        get => _loggerFactory ?? throw new NullReferenceException($"Call {nameof(SetupLogging)} first");
+        get => _loggerFactory ?? throw new InvalidOperationException($"Call {nameof(SetupLogging)} first");
         set => _loggerFactory = value;
     }
 

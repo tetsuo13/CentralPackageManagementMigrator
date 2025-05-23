@@ -21,7 +21,16 @@ internal class ProjectBuilder
         PreserveWhitespace = true
     };
 
-    public ReadOnlyDictionary<string, ReadOnlyCollection<NuGetPackageInfo>> GetPackagesInAllProjects(string searchPath)
+    /// <summary>
+    /// Recursively search for projects starting at a base directory to collect
+    /// all packages. Note that duplicates are not omitted.
+    /// </summary>
+    /// <param name="searchPath">The base directory to search for project files under.</param>
+    /// <returns>
+    /// Dictionary of project file paths to a collection of packages found in
+    /// that project.
+    /// </returns>
+    public ReadOnlyDictionary<string, List<NuGetPackageInfo>> GetPackagesInAllProjects(string searchPath)
     {
         const string searchPattern = "*.csproj";
 
@@ -29,7 +38,7 @@ internal class ProjectBuilder
         var allProjects = Directory.GetFiles(searchPath, searchPattern, SearchOption.AllDirectories);
         _logger.LogDebug("Found {Count} files", allProjects.Length);
 
-        var allPackages = new Dictionary<string, ReadOnlyCollection<NuGetPackageInfo>>();
+        var allPackages = new Dictionary<string, List<NuGetPackageInfo>>();
 
         _logger.LogInformation("Reading project files");
 
@@ -59,7 +68,7 @@ internal class ProjectBuilder
     /// <summary>
     /// For unit tests.
     /// </summary>
-    internal ReadOnlyCollection<NuGetPackageInfo> GetPackagesProjectSource(string projectSource)
+    internal List<NuGetPackageInfo> GetPackagesProjectSource(string projectSource)
     {
         var projectDocument = CreateXmlDocument();
         projectDocument.LoadXml(projectSource);
@@ -69,7 +78,7 @@ internal class ProjectBuilder
     /// <summary>
     /// For unit tests.
     /// </summary>
-    internal string UpdateProjectFromSource(string projectSource, ReadOnlyCollection<NuGetPackageInfo> packages)
+    internal string UpdateProjectFromSource(string projectSource, List<NuGetPackageInfo> packages)
     {
         var doc = CreateXmlDocument();
         doc.LoadXml(projectSource);
@@ -77,22 +86,22 @@ internal class ProjectBuilder
         return doc.OuterXml;
     }
 
-    private void RemoveVersionOnPackageReferences(XmlDocument doc, ReadOnlyCollection<NuGetPackageInfo> packages)
+    private void RemoveVersionOnPackageReferences(XmlDocument doc, List<NuGetPackageInfo> packages)
     {
-        foreach (var package in packages)
+        foreach (var packageId in packages.Select(x => x.Id))
         {
-            _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", package.Id);
-            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{package.Id}']");
+            _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", packageId);
+            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']");
 
             // TODO: Should we do something here? Assumes it should always be found. Why wouldn't it though?
             _logger.LogDebug("Found element = {ElementFound}", packageReference is not null);
 
             packageReference?.Attributes?.Remove(packageReference.Attributes["Version"]);
-            _logger.LogInformation("Removed Version attribute for package {PackageId}", package.Id);
+            _logger.LogInformation("Removed Version attribute for package {PackageId}", packageId);
         }
     }
 
-    public void UpdateProjects(ReadOnlyDictionary<string, ReadOnlyCollection<NuGetPackageInfo>> projectPackages)
+    public void UpdateProjects(ReadOnlyDictionary<string, List<NuGetPackageInfo>> projectPackages)
     {
         _logger.LogInformation("Updating project files PackageReference elements");
 
@@ -111,7 +120,7 @@ internal class ProjectBuilder
         }
     }
 
-    private ReadOnlyCollection<NuGetPackageInfo> GetPackagesInProject(XmlDocument projectDocument)
+    private List<NuGetPackageInfo> GetPackagesInProject(XmlDocument projectDocument)
     {
         _logger.LogDebug("Checking for PackageReferences");
         var packageReferences = projectDocument.SelectNodes("//PackageReference");
@@ -119,13 +128,13 @@ internal class ProjectBuilder
 
         if (packageReferences is null || packageReferences.Count < 1)
         {
-            return ReadOnlyCollection<NuGetPackageInfo>.Empty;
+            return [];
         }
 
         return GetPackagesFromReferences(packageReferences);
     }
 
-    private ReadOnlyCollection<NuGetPackageInfo> GetPackagesFromReferences(XmlNodeList packageReferences)
+    private List<NuGetPackageInfo> GetPackagesFromReferences(XmlNodeList packageReferences)
     {
         var packagesInProject = new List<NuGetPackageInfo>();
 
@@ -154,6 +163,6 @@ internal class ProjectBuilder
             packagesInProject.Add(new NuGetPackageInfo(packageName, packageVersion));
         }
 
-        return packagesInProject.AsReadOnly();
+        return packagesInProject;
     }
 }
