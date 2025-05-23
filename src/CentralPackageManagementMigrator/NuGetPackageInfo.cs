@@ -11,9 +11,10 @@ internal class NuGetPackageInfo : IEquatable<NuGetPackageInfo>
         Version = version;
     }
 
+    public override bool Equals(object? obj) => Equals(obj as NuGetPackageInfo);
     public bool Equals(NuGetPackageInfo? other)
     {
-        if (ReferenceEquals(null, other))
+        if (other is null)
         {
             return false;
         }
@@ -28,5 +29,4 @@ internal class NuGetPackageInfo : IEquatable<NuGetPackageInfo>
     }
 
     public override int GetHashCode() => HashCode.Combine(Id.ToLowerInvariant(), Version);
-    public override bool Equals(object? obj) => Equals(obj as NuGetPackageInfo);
 }

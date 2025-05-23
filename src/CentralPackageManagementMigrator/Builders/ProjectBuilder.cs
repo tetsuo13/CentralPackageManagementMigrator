@@ -88,16 +88,16 @@ internal class ProjectBuilder
 
     private void RemoveVersionOnPackageReferences(XmlDocument doc, List<NuGetPackageInfo> packages)
     {
-        foreach (var package in packages)
+        foreach (var packageId in packages.Select(x => x.Id))
         {
-            _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", package.Id);
-            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{package.Id}']");
+            _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", packageId);
+            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']");
 
             // TODO: Should we do something here? Assumes it should always be found. Why wouldn't it though?
             _logger.LogDebug("Found element = {ElementFound}", packageReference is not null);
 
             packageReference?.Attributes?.Remove(packageReference.Attributes["Version"]);
-            _logger.LogInformation("Removed Version attribute for package {PackageId}", package.Id);
+            _logger.LogInformation("Removed Version attribute for package {PackageId}", packageId);
         }
     }
 

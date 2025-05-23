@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
     <PackageId>CentralPackageManagementMigrator</PackageId>
     <PackAsTool>true</PackAsTool>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>1.1.0</VersionPrefix>
     <ToolCommandName>centralpackagemanagementmigrator</ToolCommandName>
-    <Copyright>Copyright 2024 Andrei Nicholson</Copyright>
+    <Copyright>Copyright 2024-2025 Andrei Nicholson</Copyright>
     <Authors>Andrei Nicholson</Authors>
     <PackageTags>NuGet;central;package;management;CentralPackageManagement;CPM;migrator</PackageTags>
     <Description>Migrates a codebase to use NuGet central package management (CPM)</Description>
