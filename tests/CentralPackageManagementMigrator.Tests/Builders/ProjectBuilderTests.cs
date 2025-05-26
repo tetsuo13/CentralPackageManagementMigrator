@@ -209,6 +209,37 @@ public class ProjectBuilderTests
         UpdateProjectFromSource(csproj, expected);
     }
 
+    [Fact]
+    public void UpdateProjectFromSource_VersionAsChildElementWithExcludeAssets()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                    <Version>3.6.0</Version>
+                                    <ExcludeAssets>compile</ExcludeAssets>
+                                  </PackageReference>
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                      <ExcludeAssets>compile</ExcludeAssets>
+                                    </PackageReference>
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
     private static List<NuGetPackageInfo> GetPackagesProjectSource(string csproj)
     {
         var projectBuilder = GetBuilder();
