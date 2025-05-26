@@ -198,7 +198,7 @@ internal class ProjectBuilder
 
                 if (version is null)
                 {
-                    _logger.LogWarning("No Version child attribute either");
+                    _logger.LogWarning("No Version child element either");
                     continue;
                 }
 
