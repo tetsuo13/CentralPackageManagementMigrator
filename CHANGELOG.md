@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0 (Unreleased)
+## 1.2.0 (2025-05-27)
 
 Fixed not recognizing Version child elements ([#20](https://github.com/tetsuo13/CentralPackageManagementMigrator/issues/20))
 
