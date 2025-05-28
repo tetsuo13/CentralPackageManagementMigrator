@@ -91,13 +91,52 @@ internal class ProjectBuilder
         foreach (var packageId in packages.Select(x => x.Id))
         {
             _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", packageId);
-            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']");
+            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']") as XmlElement;
 
-            // TODO: Should we do something here? Assumes it should always be found. Why wouldn't it though?
-            _logger.LogDebug("Found element = {ElementFound}", packageReference is not null);
+            if (packageReference is null)
+            {
+                _logger.LogInformation("Couldn't find any elements");
+                continue;
+            }
 
-            packageReference?.Attributes?.Remove(packageReference.Attributes["Version"]);
-            _logger.LogInformation("Removed Version attribute for package {PackageId}", packageId);
+            var removedVersion = packageReference.Attributes?.Remove(packageReference.Attributes["Version"]);
+
+            if (removedVersion is not null)
+            {
+                _logger.LogInformation("Removed Version attribute for package {PackageId}", packageId);
+                continue;
+            }
+
+            _logger.LogDebug("No Version attribute found, looking for child element");
+            var versionElement = packageReference.SelectSingleNode("Version");
+
+            if (versionElement is null)
+            {
+                _logger.LogInformation("No Version attribute and no Version child element for package {PackageId}",
+                    packageId);
+                continue;
+            }
+
+            packageReference.RemoveChild(versionElement);
+
+            // A Version child element means at least two children: one for
+            // whitespace before the element and then the element itself.
+            // Remove the leading whitespace.
+            foreach (var el in packageReference.ChildNodes.OfType<XmlWhitespace>())
+            {
+                packageReference.RemoveChild(el);
+            }
+
+            // If the PackageReference element only contained a Version while
+            // element, then there will be an additional whitespace child
+            // element which precedes the closing PackageReference element. In
+            // this case, remove all whitespace and mark the element as
+            // self-closing.
+            if (string.IsNullOrWhiteSpace(packageReference.InnerText))
+            {
+                packageReference.InnerXml = string.Empty;
+                packageReference.IsEmpty = true;
+            }
         }
     }
 
@@ -145,16 +184,25 @@ internal class ProjectBuilder
             var packageName = packageReference.Attributes?["Include"]?.Value;
             var packageVersion = packageReference.Attributes?["Version"]?.Value;
 
-            if (string.IsNullOrEmpty(packageVersion))
-            {
-                _logger.LogWarning("Detected null package version");
-                continue;
-            }
-
             if (string.IsNullOrEmpty(packageName))
             {
                 _logger.LogWarning("Found null package name");
                 continue;
+            }
+
+            if (string.IsNullOrEmpty(packageVersion))
+            {
+                _logger.LogDebug("No Version attribute found");
+
+                var version = packageReference.SelectSingleNode("Version");
+
+                if (version is null)
+                {
+                    _logger.LogWarning("No Version child element either");
+                    continue;
+                }
+
+                packageVersion = version.InnerText;
             }
 
             _logger.LogDebug("Found NuGet package {PackageName} version {PackageVersion}",

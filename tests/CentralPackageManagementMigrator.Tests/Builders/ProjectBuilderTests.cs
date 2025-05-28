@@ -51,36 +51,193 @@ public class ProjectBuilderTests
     }
 
     [Fact]
-    public void UpdateProjectFromSource_RemoveVersionAttribute()
+    public void GetPackagesProjectSource_VersionAsChildElement()
     {
-        var packages = new List<NuGetPackageInfo>
-        {
-            new("Contoso.Utility.UsefulStuff", "17.9.0")
-        };
+        const string version = "1.37.3";
         const string csproj = $"""
                                <Project Sdk="Microsoft.NET.Sdk">
 
                                  <ItemGroup>
-                                   <PackageReference Include="Contoso.Utility.UsefulStuff" Version="17.9.0" />
+                                   <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                     <Version>{version}</Version>
+                                   </PackageReference>
                                  </ItemGroup>
 
                                </Project>
                                """;
 
-        const string expected = $"""
-                                 <Project Sdk="Microsoft.NET.Sdk">
+        var packages = GetPackagesProjectSource(csproj);
 
-                                   <ItemGroup>
-                                     <PackageReference Include="Contoso.Utility.UsefulStuff" />
-                                   </ItemGroup>
+        Assert.Single(packages);
+        Assert.Equal("Contoso.Utility.UsefulStuff", packages[0].Id);
+        Assert.Equal(version, packages[0].Version);
+    }
 
-                                 </Project>
-                                 """;
+    [Fact]
+    public void GetPackagesProjectSource_VersionAsChildElementWithOtherChildren()
+    {
+        const string version = "1.37.3";
+        const string csproj = $"""
+                               <Project Sdk="Microsoft.NET.Sdk">
 
-        var projectBuilder = GetBuilder();
-        var actual = projectBuilder.UpdateProjectFromSource(csproj, packages);
+                                 <ItemGroup>
+                                   <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                     <Version>{version}</Version>
+                                     <ExcludeAssets>compile</ExcludeAssets>
+                                   </PackageReference>
+                                 </ItemGroup>
 
-        Assert.Equal(expected, actual);
+                               </Project>
+                               """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Contoso.Utility.UsefulStuff", packages[0].Id);
+        Assert.Equal(version, packages[0].Version);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_RemoveVersionAttribute()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff" Version="17.9.0" />
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff" />
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_ProjectAssetsRetained()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff" Version="3.6.0">
+                                    <ExcludeAssets>compile</ExcludeAssets>
+                                    <PrivateAssets>contentFiles</PrivateAssets>
+                                  </PackageReference>
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                      <ExcludeAssets>compile</ExcludeAssets>
+                                      <PrivateAssets>contentFiles</PrivateAssets>
+                                    </PackageReference>
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_PackageReferenceCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff" Version="3.6.0" Condition="'$(TargetFramework)' == 'net452'" />
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff" Condition="'$(TargetFramework)' == 'net452'" />
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_VersionAsChildElement()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                    <Version>3.6.0</Version>
+                                  </PackageReference>
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff" />
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_VersionAsChildElementWithExcludeAssets()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+
+                                <ItemGroup>
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                    <Version>3.6.0</Version>
+                                    <ExcludeAssets>compile</ExcludeAssets>
+                                  </PackageReference>
+                                </ItemGroup>
+
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+
+                                  <ItemGroup>
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                      <ExcludeAssets>compile</ExcludeAssets>
+                                    </PackageReference>
+                                  </ItemGroup>
+
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
     }
 
     private static List<NuGetPackageInfo> GetPackagesProjectSource(string csproj)
@@ -93,5 +250,15 @@ public class ProjectBuilderTests
     {
         var logger = NullLoggerFactory.Instance.CreateLogger<ProjectBuilderTests>();
         return new ProjectBuilder(logger);
+    }
+
+    private static void UpdateProjectFromSource(string inputProject, string expectedProject)
+    {
+        var packages = new List<NuGetPackageInfo> { new("Contoso.Utility.UsefulStuff", "3.6.0") };
+
+        var projectBuilder = GetBuilder();
+        var actual = projectBuilder.UpdateProjectFromSource(inputProject, packages);
+
+        Assert.Equal(expectedProject, actual);
     }
 }
