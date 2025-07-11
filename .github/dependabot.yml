@@ -4,6 +4,13 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      microsoft-extensions:
+        patterns:
+          - microsoft.extensions.*
+      xunit:
+        patterns:
+          - xunit*
 
   - package-ecosystem: github-actions
     directory: /
