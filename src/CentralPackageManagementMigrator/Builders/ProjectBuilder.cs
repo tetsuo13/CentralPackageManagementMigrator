@@ -9,6 +9,8 @@ namespace CentralPackageManagementMigrator.Builders;
 /// </summary>
 internal class ProjectBuilder
 {
+    private const string VersionElementName = "Version";
+
     private readonly ILogger _logger;
 
     public ProjectBuilder(ILogger logger)
@@ -91,15 +93,14 @@ internal class ProjectBuilder
         foreach (var packageId in packages.Select(x => x.Id))
         {
             _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", packageId);
-            var packageReference = doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']") as XmlElement;
 
-            if (packageReference is null)
+            if (doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']") is not XmlElement packageReference)
             {
                 _logger.LogInformation("Couldn't find any elements");
                 continue;
             }
 
-            var removedVersion = packageReference.Attributes?.Remove(packageReference.Attributes["Version"]);
+            var removedVersion = packageReference.Attributes?.Remove(packageReference.Attributes[VersionElementName]);
 
             if (removedVersion is not null)
             {
@@ -108,7 +109,7 @@ internal class ProjectBuilder
             }
 
             _logger.LogDebug("No Version attribute found, looking for child element");
-            var versionElement = packageReference.SelectSingleNode("Version");
+            var versionElement = packageReference.SelectSingleNode(VersionElementName);
 
             if (versionElement is null)
             {
@@ -127,9 +128,9 @@ internal class ProjectBuilder
                 packageReference.RemoveChild(el);
             }
 
-            // If the PackageReference element only contained a Version while
+            // If the PackageReference element only contained a Version
             // element, then there will be an additional whitespace child
-            // element which precedes the closing PackageReference element. In
+            // element that precedes the closing PackageReference element. In
             // this case, remove all whitespace and mark the element as
             // self-closing.
             if (string.IsNullOrWhiteSpace(packageReference.InnerText))
@@ -182,7 +183,7 @@ internal class ProjectBuilder
             _logger.LogDebug("Checking Include and Version attributes on PackageReference");
 
             var packageName = packageReference.Attributes?["Include"]?.Value;
-            var packageVersion = packageReference.Attributes?["Version"]?.Value;
+            var packageVersion = packageReference.Attributes?[VersionElementName]?.Value;
 
             if (string.IsNullOrEmpty(packageName))
             {
@@ -194,7 +195,7 @@ internal class ProjectBuilder
             {
                 _logger.LogDebug("No Version attribute found");
 
-                var version = packageReference.SelectSingleNode("Version");
+                var version = packageReference.SelectSingleNode(VersionElementName);
 
                 if (version is null)
                 {

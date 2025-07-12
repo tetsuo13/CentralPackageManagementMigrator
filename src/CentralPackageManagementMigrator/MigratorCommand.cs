@@ -4,19 +4,25 @@ using Microsoft.Extensions.Logging;
 
 namespace CentralPackageManagementMigrator;
 
-internal class MigratorCommand : Command
+internal class MigratorCommand : RootCommand
 {
-    private const string CommandName = "centralpackagemanagementmigrator";
     private const string CommandDescription = "Migrates a codebase to use NuGet central package management (CPM)";
 
-    private readonly Option<LogLevel> _logLevelOption = new(["-v", "--verbosity"],
-        () => LogLevel.Information,
-        "Verbosity level of the console logging output.");
-
-    public MigratorCommand() : base(CommandName, CommandDescription)
+    private readonly Option<LogLevel> _logLevelOption = new("--verbosity", "-v")
     {
-        AddOption(_logLevelOption);
-        this.SetHandler(logLevel => Migrate(logLevel), _logLevelOption);
+        Description = "Verbosity level of the console logging output.",
+        DefaultValueFactory = _ => LogLevel.Information
+    };
+
+    public MigratorCommand() : base(CommandDescription)
+    {
+        Options.Add(_logLevelOption);
+
+        SetAction(parseResult =>
+        {
+            var logLevel = parseResult.GetRequiredValue(_logLevelOption);
+            return Migrate(logLevel);
+        });
     }
 
     private static int Migrate(LogLevel logLevel)
