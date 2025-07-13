@@ -1,4 +1,5 @@
-﻿using System.CommandLine;
-using CentralPackageManagementMigrator;
+﻿using CentralPackageManagementMigrator;
 
-return await new MigratorCommand().InvokeAsync(args);
+return await new MigratorCommand()
+    .Parse(args)
+    .InvokeAsync();
