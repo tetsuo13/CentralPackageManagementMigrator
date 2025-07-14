@@ -38,6 +38,20 @@ public class NuGetPackageInfoTests
     }
 
     [Fact]
+    public void EqualityUsingEquals_Null_ReturnsFalse()
+    {
+        var package = new NuGetPackageInfo("NUnit", "1.2.3");
+        Assert.False(package.Equals(null));
+    }
+
+    [Fact]
+    public void EqualityUsingEquals_ReferenceSameObject_ReturnsTrue()
+    {
+        var package = new NuGetPackageInfo("NUnit", "1.2.3");
+        Assert.True(package.Equals(package));
+    }
+
+    [Fact]
     public void ToDistinctOrder()
     {
         var packages = new Dictionary<string, List<NuGetPackageInfo>>
