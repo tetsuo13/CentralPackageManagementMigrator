@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CentralPackageManagementMigrator/CentralPackageManagementMigrator.csproj" />
+  <Project Path="tests/CentralPackageManagementMigrator.Tests/CentralPackageManagementMigrator.Tests.csproj" />
+</Solution>
