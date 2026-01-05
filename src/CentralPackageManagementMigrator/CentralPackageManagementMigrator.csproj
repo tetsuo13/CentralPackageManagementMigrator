@@ -2,14 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>CentralPackageManagementMigrator</PackageId>
     <PackAsTool>true</PackAsTool>
     <VersionPrefix>1.2.0</VersionPrefix>
     <ToolCommandName>centralpackagemanagementmigrator</ToolCommandName>
-    <Copyright>Copyright 2024-2025 Andrei Nicholson</Copyright>
+    <Copyright>Copyright 2024-2026 Andrei Nicholson</Copyright>
     <Authors>Andrei Nicholson</Authors>
     <PackageTags>NuGet;central;package;management;CentralPackageManagement;CPM;migrator</PackageTags>
     <Description>Migrates a codebase to use NuGet central package management (CPM)</Description>
@@ -26,11 +26,12 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <DebugType>embedded</DebugType>
     <DefaultLanguage>en-US</DefaultLanguage>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1"/>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0"/>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.1" />
   </ItemGroup>
 

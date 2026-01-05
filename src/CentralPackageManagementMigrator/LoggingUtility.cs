@@ -7,11 +7,10 @@ namespace CentralPackageManagementMigrator;
 /// </summary>
 internal static class LoggingUtility
 {
-    private static ILoggerFactory? _loggerFactory;
     private static ILoggerFactory Factory
     {
-        get => _loggerFactory ?? throw new InvalidOperationException($"Call {nameof(SetupLogging)} first");
-        set => _loggerFactory = value;
+        get => field ?? throw new InvalidOperationException($"Call {nameof(SetupLogging)} first");
+        set;
     }
 
     public static void SetupLogging(LogLevel logLevel)
