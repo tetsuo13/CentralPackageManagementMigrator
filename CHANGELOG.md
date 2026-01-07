@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-.NET 10
+.NET 10 ([#49](https://github.com/tetsuo13/CentralPackageManagementMigrator/pull/49))
 
 ## 1.2.0 (2025-05-27)
 
