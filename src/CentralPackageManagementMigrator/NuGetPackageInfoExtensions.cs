@@ -1,50 +1,77 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CentralPackageManagementMigrator.Builders;
 
 namespace CentralPackageManagementMigrator;
 
-/// <summary>
-/// Intermediary extensions used by Command class to prepare data structures
-/// between builders.
-/// </summary>
 internal static class NuGetPackageInfoExtensions
 {
-    /// <summary>
-    /// Extracts all collections of NuGetPackageInfo objects to return a
-    /// collection of distinct NuGetPackageInfo objects in order by name.
-    /// </summary>
-    /// <param name="packages">
-    /// The return from <see cref="ProjectBuilder.GetPackagesInAllProjects"/>,
-    /// a dictionary of each project and the packages used.
-    /// </param>
-    /// <returns></returns>
     public static IEnumerable<NuGetPackageInfo> ToDistinctOrder(
-        this ReadOnlyDictionary<string, List<NuGetPackageInfo>> packages)
+        this ReadOnlyDictionary<string, List<NuGetPackageInfo>> packages,
+        HashSet<string> allTargetFrameworks)
     {
-        return packages.SelectMany(x => x.Value)
+        var allEntries = packages.SelectMany(x => x.Value).Distinct();
 
-            // Removes duplicates as defined by the implementation of
-            // IEquatable in NuGetPackageInfo.
-            .Distinct()
-
-            // If there are multiple versions of the same package, keeps only
-            // a single one.
-            .GroupBy(x => x.Id)
+        var grouped = allEntries
+            .GroupBy(x => (x.Id, x.Condition))
             .Select(MinimumPackageVersion)
+            .ToList();
 
-            // Order by the package names.
+        return PromoteConditional(grouped, allTargetFrameworks)
             .OrderBy(x => x.Id, StringComparer.InvariantCultureIgnoreCase);
     }
 
-    /// <summary>
-    /// Finds the instance with the "lowest" version.
-    /// </summary>
-    /// <param name="arg">A grouping of instances with the same package ID.</param>
-    /// <returns>The instance with the lowest version.</returns>
-    private static NuGetPackageInfo MinimumPackageVersion(IGrouping<string, NuGetPackageInfo> arg)
+    private static NuGetPackageInfo MinimumPackageVersion(
+        IGrouping<(string Id, string? Condition), NuGetPackageInfo> arg)
     {
-        // A naive algorithm. This will likely need to be reworked some day
-        // when encountering more complex examples.
         return arg.OrderBy(x => x.Version).First();
+    }
+
+    internal static List<NuGetPackageInfo> PromoteConditional(
+        List<NuGetPackageInfo> packages,
+        HashSet<string> allTargetFrameworks)
+    {
+        var result = new List<NuGetPackageInfo>();
+
+        foreach (var idGroup in packages.GroupBy(x => x.Id))
+        {
+            var unconditional = idGroup.FirstOrDefault(x => x.Condition is null);
+
+            if (unconditional is not null)
+            {
+                result.Add(unconditional);
+                continue;
+            }
+
+            var conditional = idGroup.ToList();
+            var coveredTfs = conditional
+                .Select(x => ExtractTargetFramework(x.Condition))
+                .Where(x => x is not null)
+                .Cast<string>()
+                .ToHashSet();
+
+            if (coveredTfs.Count > 0 && coveredTfs.IsSupersetOf(allTargetFrameworks))
+            {
+                var lowestVersion = conditional.OrderBy(x => x.Version).First();
+                result.Add(new NuGetPackageInfo(lowestVersion.Id, lowestVersion.Version, null));
+            }
+            else
+            {
+                result.AddRange(conditional);
+            }
+        }
+
+        return result;
+    }
+
+    internal static string? ExtractTargetFramework(string? condition)
+    {
+        if (string.IsNullOrEmpty(condition))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(condition, @"==\s*'([^']+)'");
+        return match.Success ? match.Groups[1].Value : null;
     }
 }

@@ -48,11 +48,12 @@ internal class MigratorCommand : RootCommand
         else
         {
             var projectBuilder = new ProjectBuilder(LoggingUtility.CreateLogger<ProjectBuilder>());
+            var allTargetFrameworks = projectBuilder.GetTargetFrameworks(searchPath);
             var packages = projectBuilder.GetPackagesInAllProjects(searchPath);
 
             if (packages.Count > 0)
             {
-                var distinctPackages = packages.ToDistinctOrder();
+                var distinctPackages = packages.ToDistinctOrder(allTargetFrameworks);
 
                 directoryPackagesProps.WriteFile(distinctPackages);
                 projectBuilder.UpdateProjects(packages);
