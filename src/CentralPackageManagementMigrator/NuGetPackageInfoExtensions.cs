@@ -13,7 +13,7 @@ internal static class NuGetPackageInfoExtensions
         var allEntries = packages.SelectMany(x => x.Value).Distinct();
 
         var grouped = allEntries
-            .GroupBy(x => (x.Id, x.Condition))
+            .GroupBy(x => (x.Id.ToLowerInvariant(), x.Condition))
             .Select(MinimumPackageVersion)
             .ToList();
 
@@ -39,7 +39,17 @@ internal static class NuGetPackageInfoExtensions
 
             if (unconditional is not null)
             {
-                result.Add(unconditional);
+                var conditionalEntries = idGroup.Where(x => x.Condition is not null).ToList();
+
+                if (conditionalEntries.Count == 0 || conditionalEntries.All(x => x.Version == unconditional.Version))
+                {
+                    result.Add(unconditional);
+                }
+                else
+                {
+                    result.AddRange(conditionalEntries);
+                }
+
                 continue;
             }
 
