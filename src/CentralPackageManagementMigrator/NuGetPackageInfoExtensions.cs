@@ -14,17 +14,17 @@ internal static class NuGetPackageInfoExtensions
 
         var grouped = allEntries
             .GroupBy(x => (x.Id.ToLowerInvariant(), x.Condition))
-            .Select(MinimumPackageVersion)
+            .Select(MaximumPackageVersion)
             .ToList();
 
         return PromoteConditional(grouped, allTargetFrameworks)
             .OrderBy(x => x.Id, StringComparer.InvariantCultureIgnoreCase);
     }
 
-    private static NuGetPackageInfo MinimumPackageVersion(
+    private static NuGetPackageInfo MaximumPackageVersion(
         IGrouping<(string Id, string? Condition), NuGetPackageInfo> arg)
     {
-        return arg.OrderBy(x => x.Version).First();
+        return arg.OrderByDescending(x => x.Version).First();
     }
 
     internal static List<NuGetPackageInfo> PromoteConditional(
@@ -62,8 +62,15 @@ internal static class NuGetPackageInfoExtensions
 
             if (coveredTfs.Count > 0 && coveredTfs.IsSupersetOf(allTargetFrameworks))
             {
-                var lowestVersion = conditional.OrderBy(x => x.Version).First();
-                result.Add(new NuGetPackageInfo(lowestVersion.Id, lowestVersion.Version, null));
+                var distinctVersions = conditional.Select(x => x.Version).Distinct().ToList();
+                if (distinctVersions.Count == 1)
+                {
+                    result.Add(new NuGetPackageInfo(conditional[0].Id, distinctVersions[0], null));
+                }
+                else
+                {
+                    result.AddRange(conditional);
+                }
             }
             else
             {

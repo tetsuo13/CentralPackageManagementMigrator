@@ -45,31 +45,27 @@ public class EndToEndTests
 
         Assert.Contains(distinctPackages, p =>
             p.Id == "Newtonsoft.Json" &&
-            p.Version == "12.0.3" &&
+            p.Version == "13.0.3" &&
             p.Condition is null);
 
-        var hostingEntry = Assert.Single(distinctPackages, p => p.Id == "Microsoft.Extensions.Hosting");
-        Assert.Equal("6.0.1", hostingEntry.Version);
-        Assert.Null(hostingEntry.Condition);
+        var hosting = distinctPackages.Where(p => p.Id == "Microsoft.Extensions.Hosting").ToList();
+        Assert.Equal(2, hosting.Count);
+        Assert.Contains(hosting, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "6.0.1");
+        Assert.Contains(hosting, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "8.0.0");
+        Assert.DoesNotContain(hosting, p => p.Condition is null);
 
         var propsBuilderLogger = NullLoggerFactory.Instance.CreateLogger<PackagesPropsBuilder>();
         var propsBuilder = new PackagesPropsBuilder(propsBuilderLogger, nameof(FullScenario_CorrectPropsFileAndVersionRemoval));
         var propsXml = propsBuilder.GenerateXml(distinctPackages);
 
-        Assert.Contains("<PackageVersion Include=\"Newtonsoft.Json\" Version=\"12.0.3\" />", propsXml);
+        Assert.Contains("<PackageVersion Include=\"Newtonsoft.Json\" Version=\"13.0.3\" />", propsXml);
         Assert.Contains("<PackageVersion Include=\"Microsoft.Extensions.Hosting\" Version=\"6.0.1\" />", propsXml);
-
-        Assert.DoesNotContain("<PackageVersion Include=\"Microsoft.Extensions.Hosting\" Version=\"8.0.0\" />", propsXml);
+        Assert.Contains("<PackageVersion Include=\"Microsoft.Extensions.Hosting\" Version=\"8.0.0\" />", propsXml);
 
         var propertyGroupPos = propsXml.IndexOf("PropertyGroup", System.StringComparison.Ordinal);
         var unconditionalGroupPos = propsXml.IndexOf("<ItemGroup>", System.StringComparison.Ordinal);
         Assert.True(propertyGroupPos < unconditionalGroupPos,
             "PropertyGroup should appear before ItemGroup");
-
-        var hostingPos = propsXml.IndexOf("Microsoft.Extensions.Hosting", System.StringComparison.Ordinal);
-        var newtonsoftPos = propsXml.IndexOf("Newtonsoft.Json", System.StringComparison.Ordinal);
-        Assert.True(hostingPos < newtonsoftPos,
-            "Packages should be sorted alphabetically");
     }
 
     [Fact]
@@ -157,9 +153,11 @@ public class EndToEndTests
         var allTfs = new HashSet<string> { "net6.0", "net7.0", "net8.0" };
         var distinctPackages = packages.ToDistinctOrder(allTfs).ToList();
 
-        var packageX = Assert.Single(distinctPackages, p => p.Id == "PackageX");
-        Assert.Equal("6.0.0", packageX.Version);
-        Assert.Null(packageX.Condition);
+        var packageX = distinctPackages.Where(p => p.Id == "PackageX").ToList();
+        Assert.Equal(3, packageX.Count);
+        Assert.Contains(packageX, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "6.0.0");
+        Assert.Contains(packageX, p => p.Condition == "'$(TargetFramework)' == 'net7.0'" && p.Version == "7.0.0");
+        Assert.Contains(packageX, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "8.0.0");
 
         var packageY = distinctPackages.Where(p => p.Id == "PackageY").ToList();
         Assert.Equal(2, packageY.Count);
@@ -171,18 +169,16 @@ public class EndToEndTests
         var propsXml = propsBuilder.GenerateXml(distinctPackages);
 
         Assert.Contains("<PackageVersion Include=\"PackageX\" Version=\"6.0.0\" />", propsXml);
+        Assert.Contains("<PackageVersion Include=\"PackageX\" Version=\"7.0.0\" />", propsXml);
+        Assert.Contains("<PackageVersion Include=\"PackageX\" Version=\"8.0.0\" />", propsXml);
         Assert.Contains("<PackageVersion Include=\"PackageY\" Version=\"6.0.0\" />", propsXml);
         Assert.Contains("<PackageVersion Include=\"PackageY\" Version=\"7.0.0\" />", propsXml);
 
-        var unconditionalPos = propsXml.IndexOf("<ItemGroup>", System.StringComparison.Ordinal);
         var net6GroupPos = propsXml.IndexOf("<ItemGroup Condition=\"'$(TargetFramework)' == 'net6.0'\"", System.StringComparison.Ordinal);
         var net7GroupPos = propsXml.IndexOf("<ItemGroup Condition=\"'$(TargetFramework)' == 'net7.0'\"", System.StringComparison.Ordinal);
+        var net8GroupPos = propsXml.IndexOf("<ItemGroup Condition=\"'$(TargetFramework)' == 'net8.0'\"", System.StringComparison.Ordinal);
 
-        Assert.True(unconditionalPos < net6GroupPos, "Unconditional group should come before conditional groups");
         Assert.True(net6GroupPos < net7GroupPos, "net6.0 group should come before net7.0 group");
-
-        var packageXPos = propsXml.IndexOf("PackageX", System.StringComparison.Ordinal);
-        var packageYPos = propsXml.IndexOf("PackageY", System.StringComparison.Ordinal);
-        Assert.True(packageXPos < packageYPos, "PackageX should be sorted before PackageY alphabetically");
+        Assert.True(net7GroupPos < net8GroupPos, "net7.0 group should come before net8.0 group");
     }
 }

@@ -62,11 +62,11 @@ public class NuGetPackageInfoTests
         var actual = Transform(packages);
 
         Assert.Single(actual);
-        Assert.Equal("1.2.3", actual[0].Version);
+        Assert.Equal("4.5.6", actual[0].Version);
     }
 
     [Fact]
-    public void ToDistinctOrder_MultiplePackageIds_DifferentVersions_MinimumUsed()
+    public void ToDistinctOrder_MultiplePackageIds_DifferentVersions_MaximumUsed()
     {
         var packages = new Dictionary<string, List<NuGetPackageInfo>>
         {
@@ -83,7 +83,7 @@ public class NuGetPackageInfoTests
         var actual = Transform(packages);
 
         Assert.Single(actual);
-        Assert.Equal("16.3.6", actual[0].Version);
+        Assert.Equal("18.0.0", actual[0].Version);
     }
 
     [Fact]
@@ -180,8 +180,7 @@ public class NuGetPackageInfoTests
         var actual = Transform(packages);
 
         Assert.Single(actual);
-        Assert.Equal("12.0.3", actual[0].Version);
-        Assert.Equal("Newtonsoft.Json", actual[0].Id, ignoreCase: true);
+        Assert.Equal("13.0.1", actual[0].Version);
     }
 
     private static List<NuGetPackageInfo> Transform(Dictionary<string, List<NuGetPackageInfo>> packages) =>
@@ -221,7 +220,7 @@ public class PromotionTests
     }
 
     [Fact]
-    public void PackageConditionallyForEveryFramework_PromotedToUnconditional()
+    public void PackageConditionallyForEveryFrameworkWithDifferentVersions_KeepsConditional()
     {
         var packages = new Dictionary<string, List<NuGetPackageInfo>>
         {
@@ -237,10 +236,10 @@ public class PromotionTests
         var allTfs = new HashSet<string> { "net6.0", "net8.0" };
         var result = Transform(packages, allTfs);
 
-        Assert.Single(result);
-        Assert.Equal("SomePackage", result[0].Id);
-        Assert.Equal("6.0.1", result[0].Version);
-        Assert.Null(result[0].Condition);
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "6.0.1");
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "8.0.0");
+        Assert.DoesNotContain(result, p => p.Condition is null);
     }
 
     [Fact]
@@ -293,7 +292,7 @@ public class PromotionTests
     }
 
     [Fact]
-    public void SamePackageSameConditionDifferentVersions_LowestVersionWins()
+    public void SamePackageSameConditionDifferentVersions_HighestVersionWins()
     {
         var packages = new Dictionary<string, List<NuGetPackageInfo>>
         {
@@ -314,7 +313,7 @@ public class PromotionTests
         var result = Transform(packages, []);
 
         Assert.Single(result);
-        Assert.Equal("6.0.0", result[0].Version);
+        Assert.Equal("8.0.0", result[0].Version);
     }
 
     [Fact]

@@ -52,12 +52,29 @@ public class NuGetPackageInfoExtensionsTests
     }
 
     [Fact]
-    public void PromoteConditional_ConditionalsCoverAllTfs_PromotesToUnconditional()
+    public void PromoteConditional_ConditionalsCoverAllTfsWithDifferentVersions_KeepsConditionals()
     {
         var packages = new List<NuGetPackageInfo>
         {
             new("Pkg", "1.0.0", "'$(TargetFramework)' == 'net6.0'"),
             new("Pkg", "2.0.0", "'$(TargetFramework)' == 'net8.0'")
+        };
+
+        var result = NuGetPackageInfoExtensions.PromoteConditional(packages, ["net6.0", "net8.0"]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "1.0.0");
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "2.0.0");
+        Assert.DoesNotContain(result, p => p.Condition is null);
+    }
+
+    [Fact]
+    public void PromoteConditional_ConditionalsCoverAllTfsWithSameVersion_PromotesToUnconditional()
+    {
+        var packages = new List<NuGetPackageInfo>
+        {
+            new("Pkg", "1.0.0", "'$(TargetFramework)' == 'net6.0'"),
+            new("Pkg", "1.0.0", "'$(TargetFramework)' == 'net8.0'")
         };
 
         var result = NuGetPackageInfoExtensions.PromoteConditional(packages, ["net6.0", "net8.0"]);
