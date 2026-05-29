@@ -13,6 +13,8 @@ internal class NuGetPackageInfo : IEquatable<NuGetPackageInfo>
         Condition = condition;
     }
 
+    public NuGetPackageInfo WithCondition(string? condition) => new(Id, Version, condition);
+
     public override bool Equals(object? obj) => Equals(obj as NuGetPackageInfo);
     public bool Equals(NuGetPackageInfo? other)
     {

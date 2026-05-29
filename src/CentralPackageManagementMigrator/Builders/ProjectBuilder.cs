@@ -54,6 +54,8 @@ internal class ProjectBuilder
 
             var packagesInProject = GetPackagesInProject(projectDocument);
 
+            packagesInProject = ApplyTargetFrameworkCondition(packagesInProject, GetProjectTargetFrameworks(projectDocument));
+
             if (packagesInProject.Count > 0)
             {
                 allPackages.Add(projectFile, packagesInProject);
@@ -129,6 +131,65 @@ internal class ProjectBuilder
         return frameworks;
     }
 
+    private static HashSet<string> GetProjectTargetFrameworks(XmlDocument doc)
+    {
+        var frameworks = new HashSet<string>();
+
+        var single = doc.SelectSingleNode("//TargetFramework");
+        if (single is not null)
+        {
+            frameworks.Add(single.InnerText.Trim());
+            return frameworks;
+        }
+
+        var multiple = doc.SelectSingleNode("//TargetFrameworks");
+        if (multiple is not null)
+        {
+            foreach (var tf in multiple.InnerText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                frameworks.Add(tf);
+            }
+        }
+
+        return frameworks;
+    }
+
+    private static List<NuGetPackageInfo> ApplyTargetFrameworkCondition(List<NuGetPackageInfo> packages, HashSet<string> projectTfs)
+    {
+        if (projectTfs.Count == 0)
+        {
+            return packages;
+        }
+
+        if (projectTfs.Count == 1)
+        {
+            var singleTf = projectTfs.Single();
+            var tfCondition = $"'$(TargetFramework)' == '{singleTf}'";
+            return packages.Select(pkg => pkg.Condition is null
+                ? pkg.WithCondition(tfCondition)
+                : pkg.WithCondition($"{pkg.Condition} and {tfCondition}"))
+                .ToList();
+        }
+
+        var result = new List<NuGetPackageInfo>(packages.Count);
+        foreach (var pkg in packages)
+        {
+            if (pkg.Condition is null)
+            {
+                foreach (var tf in projectTfs)
+                {
+                    result.Add(pkg.WithCondition($"'$(TargetFramework)' == '{tf}'"));
+                }
+            }
+            else
+            {
+                result.Add(pkg);
+            }
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// For unit tests.
     /// </summary>
@@ -136,7 +197,8 @@ internal class ProjectBuilder
     {
         var projectDocument = CreateXmlDocument();
         projectDocument.LoadXml(projectSource);
-        return GetPackagesInProject(projectDocument);
+        var packages = GetPackagesInProject(projectDocument);
+        return ApplyTargetFrameworkCondition(packages, GetProjectTargetFrameworks(projectDocument));
     }
 
     /// <summary>

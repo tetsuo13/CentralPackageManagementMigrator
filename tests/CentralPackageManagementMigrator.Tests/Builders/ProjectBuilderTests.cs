@@ -435,6 +435,92 @@ public class ProjectBuilderTests
     }
 
     [Fact]
+    public void GetPackagesProjectSource_SingleTfNoItemGroupCondition_SynthesizesCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFramework>net8.0</TargetFramework>
+                                </PropertyGroup>
+                                <ItemGroup>
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net8.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_SingleTfWithExistingCondition_MergesCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFramework>net8.0</TargetFramework>
+                                </PropertyGroup>
+                                <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(Configuration)' == 'Debug' and '$(TargetFramework)' == 'net8.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_MultiTf_NoSyntheticCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+                                </PropertyGroup>
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net6.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_MultiTfUnconditionalItemGroup_ExpandsPerTf()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+                                </PropertyGroup>
+                                <ItemGroup>
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Equal(2, packages.Count);
+        Assert.Contains(packages,
+            p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "13.0.3");
+        Assert.Contains(packages,
+            p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "13.0.3");
+    }
+
+    [Fact]
     public void GetTargetFrameworks_SingleTargetFramework_ReturnsOne()
     {
         var frameworks = GetTargetFrameworksFromSource("""
