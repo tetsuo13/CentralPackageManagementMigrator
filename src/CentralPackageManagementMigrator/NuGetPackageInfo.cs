@@ -4,12 +4,16 @@ internal class NuGetPackageInfo : IEquatable<NuGetPackageInfo>
 {
     public string Id { get; }
     public string Version { get; }
+    public string? Condition { get; }
 
-    public NuGetPackageInfo(string id, string version)
+    public NuGetPackageInfo(string id, string version, string? condition = null)
     {
         Id = id;
         Version = version;
+        Condition = condition;
     }
+
+    public NuGetPackageInfo WithCondition(string? condition) => new(Id, Version, condition);
 
     public override bool Equals(object? obj) => Equals(obj as NuGetPackageInfo);
     public bool Equals(NuGetPackageInfo? other)
@@ -25,8 +29,9 @@ internal class NuGetPackageInfo : IEquatable<NuGetPackageInfo>
         }
 
         return Id.Equals(other.Id, StringComparison.InvariantCultureIgnoreCase) &&
-               Version.Equals(other.Version);
+               Version.Equals(other.Version) &&
+               Condition == other.Condition;
     }
 
-    public override int GetHashCode() => HashCode.Combine(Id.ToLowerInvariant(), Version);
+    public override int GetHashCode() => HashCode.Combine(Id.ToLowerInvariant(), Version, Condition);
 }

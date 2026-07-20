@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Help;
+using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -9,14 +10,15 @@ namespace CentralPackageManagementMigrator.Tests;
 public class MigratorCommandTests
 {
     [Fact]
-    public void Command_Options_ContainsHelpDescriptionVerbosity()
+    public void Command_Options_ContainsHelpDescriptionVerbosityAndPath()
     {
         var command = CreateCommand();
 
-        Assert.Equal(3, command.Options.Count);
+        Assert.Equal(4, command.Options.Count);
         Assert.Single(command.Options.OfType<HelpOption>());
         Assert.Single(command.Options.OfType<VersionOption>());
         Assert.Single(command.Options.OfType<Option<LogLevel>>());
+        Assert.Single(command.Options.OfType<Option<DirectoryInfo>>());
     }
 
     [Fact]
@@ -41,14 +43,32 @@ public class MigratorCommandTests
     }
 
     [Fact]
+    public void PathOption_Contains_Aliases()
+    {
+        var command = CreateCommand();
+        var pathOption = GetPathOption(command);
+
+        Assert.Equal("--path", pathOption.Name);
+        Assert.Single(pathOption.Aliases);
+        Assert.Equal("-p", pathOption.Aliases.Single());
+    }
+
+    [Fact]
+    public void PathOption_Contains_Description()
+    {
+        var command = CreateCommand();
+        var pathOption = GetPathOption(command);
+
+        Assert.NotNull(pathOption.Description);
+        Assert.Contains("Directory", pathOption.Description);
+    }
+
+    [Fact]
     public void Parse_UnknownOption_ReportsError()
     {
         var command = CreateCommand();
         var parseResult = command.Parse(["--unknown-option-doesnt-exist", nameof(Parse_UnknownOption_ReportsError)]);
 
-        // The first arg isn't recognized as a valid option so the second
-        // isn't recognized as the value for the first arg. Instead, they both
-        // should be flagged as invalid.
         Assert.Equal(2, parseResult.Errors.Count);
     }
 
@@ -62,6 +82,19 @@ public class MigratorCommandTests
 
         Assert.Empty(parseResult.Errors);
         Assert.Equal(LogLevel.Information, parseResult.GetValue(verbosityOption));
+    }
+
+    [Fact]
+    public void Parse_NoArguments_UsesCurrentDirectory()
+    {
+        var command = CreateCommand();
+        var pathOption = GetPathOption(command);
+
+        var parseResult = command.Parse([]);
+
+        Assert.Empty(parseResult.Errors);
+        Assert.NotNull(parseResult.GetValue(pathOption));
+        Assert.Equal(Directory.GetCurrentDirectory(), parseResult.GetValue(pathOption)!.FullName);
     }
 
     [Theory]
@@ -89,8 +122,35 @@ public class MigratorCommandTests
         Assert.Single(parseResult.Errors);
     }
 
+    [Theory]
+    [InlineData("--path", "/tmp")]
+    [InlineData("-p", "/tmp")]
+    public void Parse_Path_ReturnsDirectory(string flag, string pathValue)
+    {
+        var command = CreateCommand();
+        var pathOption = GetPathOption(command);
+
+        var parseResult = command.Parse([flag, pathValue]);
+
+        Assert.Empty(parseResult.Errors);
+        Assert.NotNull(parseResult.GetValue(pathOption));
+        Assert.Equal(pathValue, parseResult.GetValue(pathOption)!.FullName);
+    }
+
+    [Fact]
+    public void Parse_PathInvalid_ReportsError()
+    {
+        var command = CreateCommand();
+        var parseResult = command.Parse(["--path", ""]);
+
+        Assert.Single(parseResult.Errors);
+    }
+
     private static MigratorCommand CreateCommand() => [];
 
     private static Option<LogLevel> GetVerbosityOption(MigratorCommand command) =>
         command.Options.OfType<Option<LogLevel>>().Single();
+
+    private static Option<DirectoryInfo> GetPathOption(MigratorCommand command) =>
+        command.Options.OfType<Option<DirectoryInfo>>().Single();
 }

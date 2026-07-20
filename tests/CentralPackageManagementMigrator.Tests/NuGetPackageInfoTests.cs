@@ -62,11 +62,11 @@ public class NuGetPackageInfoTests
         var actual = Transform(packages);
 
         Assert.Single(actual);
-        Assert.Equal("1.2.3", actual[0].Version);
+        Assert.Equal("4.5.6", actual[0].Version);
     }
 
     [Fact]
-    public void ToDistinctOrder_MultiplePackageIds_DifferentVersions_MinimumUsed()
+    public void ToDistinctOrder_MultiplePackageIds_DifferentVersions_MaximumUsed()
     {
         var packages = new Dictionary<string, List<NuGetPackageInfo>>
         {
@@ -83,7 +83,7 @@ public class NuGetPackageInfoTests
         var actual = Transform(packages);
 
         Assert.Single(actual);
-        Assert.Equal("16.3.6", actual[0].Version);
+        Assert.Equal("18.0.0", actual[0].Version);
     }
 
     [Fact]
@@ -158,6 +158,187 @@ public class NuGetPackageInfoTests
         Assert.Equal("Some.Package", actual[6].Id);
     }
 
+    [Fact]
+    public void ToDistinctOrder_SamePackageDifferentCasing_Deduplicates()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("newtonsoft.json", "13.0.1")
+                ]
+            },
+            {
+                "ProjectB",
+                [
+                    new NuGetPackageInfo("Newtonsoft.Json", "12.0.3")
+                ]
+            }
+        };
+
+        var actual = Transform(packages);
+
+        Assert.Single(actual);
+        Assert.Equal("13.0.1", actual[0].Version);
+    }
+
     private static List<NuGetPackageInfo> Transform(Dictionary<string, List<NuGetPackageInfo>> packages) =>
-        packages.AsReadOnly().ToDistinctOrder().ToList();
+        packages.AsReadOnly().ToDistinctOrder([]).ToList();
+
+    private static List<NuGetPackageInfo> Transform(Dictionary<string, List<NuGetPackageInfo>> packages, HashSet<string> allTargetFrameworks) =>
+        packages.AsReadOnly().ToDistinctOrder(allTargetFrameworks).ToList();
+}
+
+public class PromotionTests
+{
+    [Fact]
+    public void PackageUnconditionallyAndConditionallyWithDifferentVersions_KeepsConditionals()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("SomePackage", "1.0.0", null)
+                ]
+            },
+            {
+                "ProjectB",
+                [
+                    new NuGetPackageInfo("SomePackage", "6.0.1", "'$(TargetFramework)' == 'net6.0'")
+                ]
+            }
+        };
+
+        var result = Transform(packages, []);
+
+        Assert.Single(result);
+        Assert.Equal("SomePackage", result[0].Id);
+        Assert.Equal("6.0.1", result[0].Version);
+        Assert.Equal("'$(TargetFramework)' == 'net6.0'", result[0].Condition);
+    }
+
+    [Fact]
+    public void PackageConditionallyForEveryFrameworkWithDifferentVersions_KeepsConditional()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("SomePackage", "6.0.1", "'$(TargetFramework)' == 'net6.0'"),
+                    new NuGetPackageInfo("SomePackage", "8.0.0", "'$(TargetFramework)' == 'net8.0'")
+                ]
+            }
+        };
+
+        var allTfs = new HashSet<string> { "net6.0", "net8.0" };
+        var result = Transform(packages, allTfs);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "6.0.1");
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "8.0.0");
+        Assert.DoesNotContain(result, p => p.Condition is null);
+    }
+
+    [Fact]
+    public void PackageConditionallyForSubsetOfFrameworks_KeptInConditionalGroups()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("SomePackage", "6.0.1", "'$(TargetFramework)' == 'net6.0'"),
+                    new NuGetPackageInfo("SomePackage", "8.0.0", "'$(TargetFramework)' == 'net8.0'")
+                ]
+            }
+        };
+
+        var allTfs = new HashSet<string> { "net6.0", "net8.0", "net9.0" };
+        var result = Transform(packages, allTfs);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "6.0.1");
+        Assert.Contains(result, p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "8.0.0");
+    }
+
+    [Fact]
+    public void PackageUnconditionallyAndConditionallyWithSameVersion_DropsConditionals()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("SomePackage", "1.0.0", null)
+                ]
+            },
+            {
+                "ProjectB",
+                [
+                    new NuGetPackageInfo("SomePackage", "1.0.0", "'$(TargetFramework)' == 'net6.0'")
+                ]
+            }
+        };
+
+        var result = Transform(packages, []);
+
+        Assert.Single(result);
+        Assert.Equal("SomePackage", result[0].Id);
+        Assert.Equal("1.0.0", result[0].Version);
+        Assert.Null(result[0].Condition);
+    }
+
+    [Fact]
+    public void SamePackageSameConditionDifferentVersions_HighestVersionWins()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("SomePackage", "8.0.0", "'$(TargetFramework)' == 'net8.0'")
+                ]
+            },
+            {
+                "ProjectB",
+                [
+                    new NuGetPackageInfo("SomePackage", "6.0.0", "'$(TargetFramework)' == 'net8.0'")
+                ]
+            }
+        };
+
+        var result = Transform(packages, []);
+
+        Assert.Single(result);
+        Assert.Equal("8.0.0", result[0].Version);
+    }
+
+    [Fact]
+    public void SeparatePackagesNoSharedIds_AllPreserved()
+    {
+        var packages = new Dictionary<string, List<NuGetPackageInfo>>
+        {
+            {
+                "ProjectA",
+                [
+                    new NuGetPackageInfo("PackageA", "1.0.0"),
+                    new NuGetPackageInfo("PackageB", "2.0.0")
+                ]
+            }
+        };
+
+        var result = Transform(packages, []);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Id == "PackageA" && p.Version == "1.0.0");
+        Assert.Contains(result, p => p.Id == "PackageB" && p.Version == "2.0.0");
+    }
+
+    private static List<NuGetPackageInfo> Transform(Dictionary<string, List<NuGetPackageInfo>> packages, HashSet<string> allTargetFrameworks)
+    {
+        return packages.AsReadOnly().ToDistinctOrder(allTargetFrameworks).ToList();
+    }
 }

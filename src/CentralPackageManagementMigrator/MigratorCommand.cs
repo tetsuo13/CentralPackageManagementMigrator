@@ -14,18 +14,26 @@ internal class MigratorCommand : RootCommand
         DefaultValueFactory = _ => LogLevel.Information
     };
 
+    private readonly Option<DirectoryInfo> _pathOption = new("--path", "-p")
+    {
+        Description = "Directory to search for project files under.",
+        DefaultValueFactory = _ => new DirectoryInfo(Directory.GetCurrentDirectory())
+    };
+
     public MigratorCommand() : base(CommandDescription)
     {
         Options.Add(_logLevelOption);
+        Options.Add(_pathOption);
 
         SetAction(parseResult =>
         {
             var logLevel = parseResult.GetRequiredValue(_logLevelOption);
-            return Migrate(logLevel);
+            var path = parseResult.GetRequiredValue(_pathOption);
+            return Migrate(logLevel, path);
         });
     }
 
-    private static int Migrate(LogLevel logLevel)
+    private static int Migrate(LogLevel logLevel, DirectoryInfo? path = null)
     {
         var exitCode = 0;
         LoggingUtility.SetupLogging(logLevel);
@@ -33,7 +41,7 @@ internal class MigratorCommand : RootCommand
 
         logger.LogDebug("Called with verbosity: {Level}", logLevel.ToString());
 
-        var searchPath = Directory.GetCurrentDirectory();
+        var searchPath = path?.FullName ?? Directory.GetCurrentDirectory();
         logger.LogInformation("Adding central package management under search path: {SearchPath}", searchPath);
 
         var directoryPackagesProps = new PackagesPropsBuilder(LoggingUtility.CreateLogger<PackagesPropsBuilder>(),
@@ -48,11 +56,12 @@ internal class MigratorCommand : RootCommand
         else
         {
             var projectBuilder = new ProjectBuilder(LoggingUtility.CreateLogger<ProjectBuilder>());
+            var allTargetFrameworks = projectBuilder.GetTargetFrameworks(searchPath);
             var packages = projectBuilder.GetPackagesInAllProjects(searchPath);
 
             if (packages.Count > 0)
             {
-                var distinctPackages = packages.ToDistinctOrder();
+                var distinctPackages = packages.ToDistinctOrder(allTargetFrameworks);
 
                 directoryPackagesProps.WriteFile(distinctPackages);
                 projectBuilder.UpdateProjects(packages);
