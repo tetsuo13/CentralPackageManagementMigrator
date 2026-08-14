@@ -79,19 +79,46 @@ internal class PackagesPropsBuilder
         propertyGroup.AppendChild(managePackageVersionsCentrally);
         project.AppendChild(propertyGroup);
 
-        var itemGroup = doc.CreateElement(string.Empty, "ItemGroup", string.Empty);
+        var sortedPackages = packages.OrderBy(x => x.Id, StringComparer.InvariantCultureIgnoreCase).ToList();
 
-        foreach (var package in packages)
+        var unconditionalGroup = doc.CreateElement(string.Empty, "ItemGroup", string.Empty);
+
+        var conditionalGroups = sortedPackages
+            .Where(p => p.Condition is not null)
+            .GroupBy(p => p.Condition!)
+            .ToList();
+
+        foreach (var package in sortedPackages.Where(p => p.Condition is null))
         {
-            var packageVersion = doc.CreateElement(string.Empty, "PackageVersion", string.Empty);
-            packageVersion.SetAttribute("Include", package.Id);
-            packageVersion.SetAttribute("Version", package.Version);
-
-            itemGroup.AppendChild(packageVersion);
+            AddPackageVersion(doc, unconditionalGroup, package);
         }
 
-        project.AppendChild(itemGroup);
+        if (unconditionalGroup.HasChildNodes)
+        {
+            project.AppendChild(unconditionalGroup);
+        }
+
+        foreach (var group in conditionalGroups)
+        {
+            var itemGroup = doc.CreateElement(string.Empty, "ItemGroup", string.Empty);
+            itemGroup.SetAttribute("Condition", group.Key);
+
+            foreach (var package in group.OrderBy(p => p.Id, StringComparer.InvariantCultureIgnoreCase))
+            {
+                AddPackageVersion(doc, itemGroup, package);
+            }
+
+            project.AppendChild(itemGroup);
+        }
 
         return doc;
+    }
+
+    private static void AddPackageVersion(XmlDocument doc, XmlElement itemGroup, NuGetPackageInfo package)
+    {
+        var packageVersion = doc.CreateElement(string.Empty, "PackageVersion", string.Empty);
+        packageVersion.SetAttribute("Include", package.Id);
+        packageVersion.SetAttribute("Version", package.Version);
+        itemGroup.AppendChild(packageVersion);
     }
 }

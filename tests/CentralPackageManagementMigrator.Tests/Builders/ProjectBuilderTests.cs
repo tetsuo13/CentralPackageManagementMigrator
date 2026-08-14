@@ -240,6 +240,320 @@ public class ProjectBuilderTests
         UpdateProjectFromSource(csproj, expected);
     }
 
+    [Fact]
+    public void GetPackagesProjectSource_PackageReferenceInPlainItemGroup_ConditionIsNull()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup>
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Null(packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_PackageReferenceInConditionalItemGroup_ConditionMatches()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="SomePackage" Version="6.0.1" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("SomePackage", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net6.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_MultipleConditionalItemGroups_EachCarriesOwnCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="PackageA" Version="6.0.0" />
+                                </ItemGroup>
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+                                  <PackageReference Include="PackageB" Version="8.0.0" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Equal(2, packages.Count);
+        Assert.Equal("PackageA", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net6.0'", packages[0].Condition);
+        Assert.Equal("PackageB", packages[1].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net8.0'", packages[1].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_PackageReferenceNoVersion_Skipped()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup>
+                                  <PackageReference Include="SomePackage" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Empty(packages);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_NoPackageReferences_ReturnsEmpty()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Empty(packages);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_VersionAttributeInConditionalItemGroup_Removed()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff" Version="6.0.1" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+                                  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff" />
+                                  </ItemGroup>
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_VersionAsChildElementInConditionalItemGroup_Removed()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="Contoso.Utility.UsefulStuff">
+                                    <Version>6.0.1</Version>
+                                  </PackageReference>
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+                                  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                    <PackageReference Include="Contoso.Utility.UsefulStuff" />
+                                  </ItemGroup>
+                                </Project>
+                                """;
+
+        UpdateProjectFromSource(csproj, expected);
+    }
+
+    [Fact]
+    public void UpdateProjectFromSource_SamePackageInConditionalAndUnconditional_VersionRemovedFromBoth()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup>
+                                  <PackageReference Include="SomePackage" Version="1.0.0" />
+                                </ItemGroup>
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+                                  <PackageReference Include="SomePackage" Version="8.0.0" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        const string expected = """
+                                <Project Sdk="Microsoft.NET.Sdk">
+                                  <ItemGroup>
+                                    <PackageReference Include="SomePackage" />
+                                  </ItemGroup>
+                                  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+                                    <PackageReference Include="SomePackage" />
+                                  </ItemGroup>
+                                </Project>
+                                """;
+
+        var packages = new List<NuGetPackageInfo>
+        {
+            new("SomePackage", "1.0.0", null),
+            new("SomePackage", "8.0.0", "'$(TargetFramework)' == 'net8.0'")
+        };
+
+        var projectBuilder = GetBuilder();
+        var actual = projectBuilder.UpdateProjectFromSource(csproj, packages);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_SamePackageInConditionalAndUnconditional_BothCaptured()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <ItemGroup>
+                                  <PackageReference Include="SomePackage" Version="1.0.0" />
+                                </ItemGroup>
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+                                  <PackageReference Include="SomePackage" Version="8.0.0" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Equal(2, packages.Count);
+        var unconditional = Assert.Single(packages, p => p.Condition is null);
+        Assert.Equal("1.0.0", unconditional.Version);
+        var conditional = Assert.Single(packages, p => p.Condition is not null);
+        Assert.Equal("'$(TargetFramework)' == 'net8.0'", conditional.Condition);
+        Assert.Equal("8.0.0", conditional.Version);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_SingleTfNoItemGroupCondition_SynthesizesCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFramework>net8.0</TargetFramework>
+                                </PropertyGroup>
+                                <ItemGroup>
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net8.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_SingleTfWithExistingCondition_MergesCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFramework>net8.0</TargetFramework>
+                                </PropertyGroup>
+                                <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(Configuration)' == 'Debug' and '$(TargetFramework)' == 'net8.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_MultiTf_NoSyntheticCondition()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+                                </PropertyGroup>
+                                <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Single(packages);
+        Assert.Equal("Newtonsoft.Json", packages[0].Id);
+        Assert.Equal("'$(TargetFramework)' == 'net6.0'", packages[0].Condition);
+    }
+
+    [Fact]
+    public void GetPackagesProjectSource_MultiTfUnconditionalItemGroup_ExpandsPerTf()
+    {
+        const string csproj = """
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+                                </PropertyGroup>
+                                <ItemGroup>
+                                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                                </ItemGroup>
+                              </Project>
+                              """;
+
+        var packages = GetPackagesProjectSource(csproj);
+
+        Assert.Equal(2, packages.Count);
+        Assert.Contains(packages,
+            p => p.Condition == "'$(TargetFramework)' == 'net6.0'" && p.Version == "13.0.3");
+        Assert.Contains(packages,
+            p => p.Condition == "'$(TargetFramework)' == 'net8.0'" && p.Version == "13.0.3");
+    }
+
+    [Fact]
+    public void GetTargetFrameworks_SingleTargetFramework_ReturnsOne()
+    {
+        var frameworks = GetTargetFrameworksFromSource("""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        Assert.Equal(new HashSet<string> { "net8.0" }, frameworks);
+    }
+
+    [Fact]
+    public void GetTargetFrameworks_MultipleTargetFrameworks_ReturnsAll()
+    {
+        var frameworks = GetTargetFrameworksFromSource("""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        Assert.Equal(new HashSet<string> { "net6.0", "net8.0" }, frameworks);
+    }
+
+    private static HashSet<string> GetTargetFrameworksFromSource(string csprojSource)
+    {
+        var projectBuilder = GetBuilder();
+        return projectBuilder.GetTargetFrameworksFromSource(csprojSource);
+    }
+
     private static List<NuGetPackageInfo> GetPackagesProjectSource(string csproj)
     {
         var projectBuilder = GetBuilder();

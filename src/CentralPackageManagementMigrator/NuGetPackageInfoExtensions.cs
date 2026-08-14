@@ -1,50 +1,94 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CentralPackageManagementMigrator.Builders;
 
 namespace CentralPackageManagementMigrator;
 
-/// <summary>
-/// Intermediary extensions used by Command class to prepare data structures
-/// between builders.
-/// </summary>
 internal static class NuGetPackageInfoExtensions
 {
-    /// <summary>
-    /// Extracts all collections of NuGetPackageInfo objects to return a
-    /// collection of distinct NuGetPackageInfo objects in order by name.
-    /// </summary>
-    /// <param name="packages">
-    /// The return from <see cref="ProjectBuilder.GetPackagesInAllProjects"/>,
-    /// a dictionary of each project and the packages used.
-    /// </param>
-    /// <returns></returns>
     public static IEnumerable<NuGetPackageInfo> ToDistinctOrder(
-        this ReadOnlyDictionary<string, List<NuGetPackageInfo>> packages)
+        this ReadOnlyDictionary<string, List<NuGetPackageInfo>> packages,
+        HashSet<string> allTargetFrameworks)
     {
-        return packages.SelectMany(x => x.Value)
+        var allEntries = packages.SelectMany(x => x.Value).Distinct();
 
-            // Removes duplicates as defined by the implementation of
-            // IEquatable in NuGetPackageInfo.
-            .Distinct()
+        var grouped = allEntries
+            .GroupBy(x => (x.Id.ToLowerInvariant(), x.Condition))
+            .Select(MaximumPackageVersion)
+            .ToList();
 
-            // If there are multiple versions of the same package, keeps only
-            // a single one.
-            .GroupBy(x => x.Id)
-            .Select(MinimumPackageVersion)
-
-            // Order by the package names.
+        return PromoteConditional(grouped, allTargetFrameworks)
             .OrderBy(x => x.Id, StringComparer.InvariantCultureIgnoreCase);
     }
 
-    /// <summary>
-    /// Finds the instance with the "lowest" version.
-    /// </summary>
-    /// <param name="arg">A grouping of instances with the same package ID.</param>
-    /// <returns>The instance with the lowest version.</returns>
-    private static NuGetPackageInfo MinimumPackageVersion(IGrouping<string, NuGetPackageInfo> arg)
+    private static NuGetPackageInfo MaximumPackageVersion(
+        IGrouping<(string Id, string? Condition), NuGetPackageInfo> arg)
     {
-        // A naive algorithm. This will likely need to be reworked some day
-        // when encountering more complex examples.
-        return arg.OrderBy(x => x.Version).First();
+        return arg.OrderByDescending(x => x.Version).First();
+    }
+
+    internal static List<NuGetPackageInfo> PromoteConditional(
+        List<NuGetPackageInfo> packages,
+        HashSet<string> allTargetFrameworks)
+    {
+        var result = new List<NuGetPackageInfo>();
+
+        foreach (var idGroup in packages.GroupBy(x => x.Id))
+        {
+            var unconditional = idGroup.FirstOrDefault(x => x.Condition is null);
+
+            if (unconditional is not null)
+            {
+                var conditionalEntries = idGroup.Where(x => x.Condition is not null).ToList();
+
+                if (conditionalEntries.Count == 0 || conditionalEntries.All(x => x.Version == unconditional.Version))
+                {
+                    result.Add(unconditional);
+                }
+                else
+                {
+                    result.AddRange(conditionalEntries);
+                }
+
+                continue;
+            }
+
+            var conditional = idGroup.ToList();
+            var coveredTfs = conditional
+                .Select(x => ExtractTargetFramework(x.Condition))
+                .Where(x => x is not null)
+                .Cast<string>()
+                .ToHashSet();
+
+            if (coveredTfs.Count > 0 && coveredTfs.IsSupersetOf(allTargetFrameworks))
+            {
+                var distinctVersions = conditional.Select(x => x.Version).Distinct().ToList();
+                if (distinctVersions.Count == 1)
+                {
+                    result.Add(new NuGetPackageInfo(conditional[0].Id, distinctVersions[0], null));
+                }
+                else
+                {
+                    result.AddRange(conditional);
+                }
+            }
+            else
+            {
+                result.AddRange(conditional);
+            }
+        }
+
+        return result;
+    }
+
+    internal static string? ExtractTargetFramework(string? condition)
+    {
+        if (string.IsNullOrEmpty(condition))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(condition, @"==\s*'([^']+)'");
+        return match.Success ? match.Groups[1].Value : null;
     }
 }

@@ -54,6 +54,8 @@ internal class ProjectBuilder
 
             var packagesInProject = GetPackagesInProject(projectDocument);
 
+            packagesInProject = ApplyTargetFrameworkCondition(packagesInProject, GetProjectTargetFrameworks(projectDocument));
+
             if (packagesInProject.Count > 0)
             {
                 allPackages.Add(projectFile, packagesInProject);
@@ -70,11 +72,133 @@ internal class ProjectBuilder
     /// <summary>
     /// For unit tests.
     /// </summary>
+    internal HashSet<string> GetTargetFrameworksFromSource(string projectSource)
+    {
+        var doc = CreateXmlDocument();
+        doc.LoadXml(projectSource);
+        var frameworks = new HashSet<string>();
+
+        var single = doc.SelectSingleNode("//TargetFramework");
+        if (single is not null)
+        {
+            frameworks.Add(single.InnerText.Trim());
+        }
+
+        var multiple = doc.SelectSingleNode("//TargetFrameworks");
+        if (multiple is not null)
+        {
+            foreach (var tf in multiple.InnerText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                frameworks.Add(tf);
+            }
+        }
+
+        return frameworks;
+    }
+
+    public HashSet<string> GetTargetFrameworks(string searchPath)
+    {
+        const string searchPattern = "*.csproj";
+
+        _logger.LogInformation("Collecting target frameworks from {SearchPattern} files under: {SearchPath}",
+            searchPattern, searchPath);
+        var allProjects = Directory.GetFiles(searchPath, searchPattern, SearchOption.AllDirectories);
+
+        var frameworks = new HashSet<string>();
+
+        foreach (var projectFile in allProjects)
+        {
+            var doc = CreateXmlDocument();
+            doc.Load(projectFile);
+
+            var single = doc.SelectSingleNode("//TargetFramework");
+            if (single is not null)
+            {
+                frameworks.Add(single.InnerText.Trim());
+                continue;
+            }
+
+            var multiple = doc.SelectSingleNode("//TargetFrameworks");
+            if (multiple is not null)
+            {
+                foreach (var tf in multiple.InnerText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    frameworks.Add(tf);
+                }
+            }
+        }
+
+        return frameworks;
+    }
+
+    private static HashSet<string> GetProjectTargetFrameworks(XmlDocument doc)
+    {
+        var frameworks = new HashSet<string>();
+
+        var single = doc.SelectSingleNode("//TargetFramework");
+        if (single is not null)
+        {
+            frameworks.Add(single.InnerText.Trim());
+            return frameworks;
+        }
+
+        var multiple = doc.SelectSingleNode("//TargetFrameworks");
+        if (multiple is not null)
+        {
+            foreach (var tf in multiple.InnerText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                frameworks.Add(tf);
+            }
+        }
+
+        return frameworks;
+    }
+
+    private static List<NuGetPackageInfo> ApplyTargetFrameworkCondition(List<NuGetPackageInfo> packages, HashSet<string> projectTfs)
+    {
+        if (projectTfs.Count == 0)
+        {
+            return packages;
+        }
+
+        if (projectTfs.Count == 1)
+        {
+            var singleTf = projectTfs.Single();
+            var tfCondition = $"'$(TargetFramework)' == '{singleTf}'";
+            return packages.Select(pkg => pkg.Condition is null
+                ? pkg.WithCondition(tfCondition)
+                : pkg.WithCondition($"{pkg.Condition} and {tfCondition}"))
+                .ToList();
+        }
+
+        var result = new List<NuGetPackageInfo>(packages.Count);
+        foreach (var pkg in packages)
+        {
+            if (pkg.Condition is null)
+            {
+                foreach (var tf in projectTfs)
+                {
+                    result.Add(pkg.WithCondition($"'$(TargetFramework)' == '{tf}'"));
+                }
+            }
+            else
+            {
+                result.Add(pkg);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// For unit tests.
+    /// </summary>
     internal List<NuGetPackageInfo> GetPackagesProjectSource(string projectSource)
     {
         var projectDocument = CreateXmlDocument();
         projectDocument.LoadXml(projectSource);
-        return GetPackagesInProject(projectDocument);
+        var packages = GetPackagesInProject(projectDocument);
+        return ApplyTargetFrameworkCondition(packages, GetProjectTargetFrameworks(projectDocument));
     }
 
     /// <summary>
@@ -90,54 +214,52 @@ internal class ProjectBuilder
 
     private void RemoveVersionOnPackageReferences(XmlDocument doc, List<NuGetPackageInfo> packages)
     {
-        foreach (var packageId in packages.Select(x => x.Id))
+        foreach (var packageId in packages.Select(x => x.Id).Distinct())
         {
-            _logger.LogDebug("Locating single PackageReference for Includes = {PackageId}", packageId);
+            _logger.LogDebug("Locating PackageReferences for Include = {PackageId}", packageId);
 
-            if (doc.SelectSingleNode($"//PackageReference[@Include='{packageId}']") is not XmlElement packageReference)
+            var matches = doc.SelectNodes($"//PackageReference[@Include='{packageId}']");
+
+            if (matches is null || matches.Count == 0)
             {
                 _logger.LogInformation("Couldn't find any elements");
                 continue;
             }
 
-            var removedVersion = packageReference.Attributes?.Remove(packageReference.Attributes[VersionElementName]);
-
-            if (removedVersion is not null)
+            foreach (XmlNode match in matches)
             {
-                _logger.LogInformation("Removed Version attribute for package {PackageId}", packageId);
-                continue;
+                RemoveVersionFromReference((XmlElement)match, packageId);
             }
+        }
+    }
 
-            _logger.LogDebug("No Version attribute found, looking for child element");
-            var versionElement = packageReference.SelectSingleNode(VersionElementName);
+    private static void RemoveVersionFromReference(XmlElement packageReference, string packageId)
+    {
+        var removedVersion = packageReference.Attributes?.Remove(packageReference.Attributes[VersionElementName]);
 
-            if (versionElement is null)
-            {
-                _logger.LogInformation("No Version attribute and no Version child element for package {PackageId}",
-                    packageId);
-                continue;
-            }
+        if (removedVersion is not null)
+        {
+            return;
+        }
 
-            packageReference.RemoveChild(versionElement);
+        var versionElement = packageReference.SelectSingleNode(VersionElementName);
 
-            // A Version child element means at least two children: one for
-            // whitespace before the element and then the element itself.
-            // Remove the leading whitespace.
-            foreach (var el in packageReference.ChildNodes.OfType<XmlWhitespace>())
-            {
-                packageReference.RemoveChild(el);
-            }
+        if (versionElement is null)
+        {
+            return;
+        }
 
-            // If the PackageReference element only contained a Version
-            // element, then there will be an additional whitespace child
-            // element that precedes the closing PackageReference element. In
-            // this case, remove all whitespace and mark the element as
-            // self-closing.
-            if (string.IsNullOrWhiteSpace(packageReference.InnerText))
-            {
-                packageReference.InnerXml = string.Empty;
-                packageReference.IsEmpty = true;
-            }
+        packageReference.RemoveChild(versionElement);
+
+        foreach (var el in packageReference.ChildNodes.OfType<XmlWhitespace>())
+        {
+            packageReference.RemoveChild(el);
+        }
+
+        if (string.IsNullOrWhiteSpace(packageReference.InnerText))
+        {
+            packageReference.InnerXml = string.Empty;
+            packageReference.IsEmpty = true;
         }
     }
 
@@ -206,10 +328,14 @@ internal class ProjectBuilder
                 packageVersion = version.InnerText;
             }
 
-            _logger.LogDebug("Found NuGet package {PackageName} version {PackageVersion}",
-                packageName, packageVersion);
+            var condition = (packageReference.ParentNode as XmlElement)?.GetAttribute("Condition");
+            var conditionValue = string.IsNullOrEmpty(condition) ? null : condition;
 
-            packagesInProject.Add(new NuGetPackageInfo(packageName, packageVersion));
+            _logger.LogDebug("Found NuGet package {PackageName} version {PackageVersion}{Condition}",
+                packageName, packageVersion,
+                conditionValue is not null ? $" condition: {conditionValue}" : "");
+
+            packagesInProject.Add(new NuGetPackageInfo(packageName, packageVersion, conditionValue));
         }
 
         return packagesInProject;
