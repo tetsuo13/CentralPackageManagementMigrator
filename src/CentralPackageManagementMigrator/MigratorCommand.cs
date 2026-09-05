@@ -28,6 +28,7 @@ internal class MigratorCommand : RootCommand
             }
             catch
             {
+                // Uncaught exception occurred. Indicate error.
             }
 
             return 1;

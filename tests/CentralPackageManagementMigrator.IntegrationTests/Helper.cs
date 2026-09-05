@@ -5,16 +5,19 @@ namespace CentralPackageManagementMigrator.IntegrationTests;
 internal sealed class Helper : IDisposable
 {
     /// <summary>
+    /// Contains absolute paths to various directories used for the test.
     /// </summary>
     /// <param name="Base">
     /// The temporary directory created for the requested test. Will serve as
     /// the working directory for the migrator command to run in.
     /// </param>
     /// <param name="Actual">
-    /// The subdirectory from <c>TestData/{TestX}</c> for the starting files.
+    /// Path to the <c>Actual</c> directory that contains setup files for the
+    /// test.
     /// </param>
     /// <param name="Expected">
-    /// The subdirectory from <c>TestData/{TestX}</c> for the expected files.
+    /// Path to the <c>Expected</c> directory that contains expected files for
+    /// the test.
     /// </param>
     private readonly record struct WorkDirectory(string Base, string Actual, string Expected);
 
@@ -38,18 +41,18 @@ internal sealed class Helper : IDisposable
             WorkDirectoryInfo = FindWorkDirectory(test)
         };
 
+        // Copy actual files to the work directory.
         CopyDirectory(helper.WorkDirectoryInfo.Actual, helper.WorkDirectoryInfo.Base);
 
-        // Assert.Equal("derp", helper.WorkDirectoryInfo.Base);
         return helper;
     }
 
     public async Task<int> RunMigrator()
     {
         Directory.SetCurrentDirectory(WorkDirectoryInfo.Base);
+
         var command = new MigratorCommand();
-        var code = await command.Parse([]).InvokeAsync(null, TestContext.Current.CancellationToken);
-        return code;
+        return await command.Parse([]).InvokeAsync(null, TestContext.Current.CancellationToken);
     }
 
     public async Task AssertDirectoryPackagesFile()
