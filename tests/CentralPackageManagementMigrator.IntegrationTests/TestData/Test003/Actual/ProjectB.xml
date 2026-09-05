@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="nunit" Version="4.3.2" />
+  </ItemGroup>
+</Project>

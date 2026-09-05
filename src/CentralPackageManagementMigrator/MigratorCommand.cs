@@ -21,7 +21,17 @@ internal class MigratorCommand : RootCommand
         SetAction(parseResult =>
         {
             var logLevel = parseResult.GetRequiredValue(_logLevelOption);
-            return Migrate(logLevel);
+
+            try
+            {
+                return Migrate(logLevel);
+            }
+            catch
+            {
+                // Uncaught exception occurred. Indicate error.
+            }
+
+            return 1;
         });
     }
 
