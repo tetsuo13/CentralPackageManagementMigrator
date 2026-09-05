@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests"/>
+    <InternalsVisibleTo Include="$(MSBuildProjectName).IntegrationTests"/>
   </ItemGroup>
 
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">

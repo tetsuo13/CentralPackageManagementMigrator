@@ -33,7 +33,7 @@ internal static class LoggingUtility
     /// existing logs that haven't been output yet. Failure to call this
     /// method may result in lost messages.
     /// </summary>
-    public static void FlushLogging() => Factory?.Dispose();
+    public static void FlushLogging() => Factory.Dispose();
 
     public static ILogger<T> CreateLogger<T>() => Factory.CreateLogger<T>();
 }
